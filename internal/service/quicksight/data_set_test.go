@@ -976,6 +976,100 @@ resource "aws_quicksight_data_set" "test" {
 `, rId, rName))
 }
 
+func testAccDataSetConfigDataSetParameters(rId, rName string) string {
+	return acctest.ConfigCompose(
+		testAccDataSetConfigBase(rId, rName),
+		fmt.Sprintf(`
+resource "aws_quicksight_data_set" "test" {
+  data_set_id = %[1]q
+  name        = %[2]q
+  import_mode = "SPICE"
+
+  physical_table_map {
+    physical_table_map_id = %[1]q
+    s3_source {
+      data_source_arn = aws_quicksight_data_source.test.arn
+      input_columns {
+        name = "Column1"
+        type = "STRING"
+      }
+      upload_settings {
+        format = "JSON"
+      }
+    }
+  }
+  dataset_parameter {
+    string_dataset_parameter {
+      id             = "StringID1"
+      name           = "StringName1"
+      value_type     = "SINGLE_VALUED"
+      default_values = {
+        static_values = ["a"]
+      }
+    }
+    string_dataset_parameter {
+      id             = "StringID2"
+      name           = "StringName2"
+      value_type     = "MULTI_VALUED"
+      default_values = {
+        static_values = ["a", "b"]
+      }
+    }
+    integer_dataset_parameter {
+      id             = "IntegerID1"
+      name           = "IntegerName1"
+      value_type     = "SINGLE_VALUED"
+      default_values = {
+        static_values = [1]
+      }
+    }
+    integer_dataset_parameter {
+      id             = "IntegerID2"
+      name           = "IntegerName2"
+      value_type     = "MULTI_VALUED"
+      default_values = {
+        static_values = [1, 2]
+      }
+    }
+    decimal_dataset_parameter {
+      id             = "DecimalID1"
+      name           = "DecimalName1"
+      value_type     = "SINGLE_VALUED"
+      default_values = {
+        static_values = [1.5]
+      }
+    }
+	decimal_dataset_parameter {
+      id             = "DecimalID2"
+      name           = "DecimalName2"
+      value_type     = "MULTI_VALUED"
+      default_values = {
+        static_values = [1.5, 2.5]
+      }
+    }
+    date_time_dataset_parameter {
+      id                   = "DateTimeID1"
+      name                 = "DateTimeName2"
+      value_type           = "SINGLE_VALUED"
+      default_values = {
+        static_values = ["1970-01-01"]
+      }
+      time_granularity_day = "DAY"
+    }
+	date_time_dataset_parameter {
+      id                   = "DateTimeID2"
+      name                 = "DateTimeName2"
+      value_type           = "MULTI_VALUED"
+      default_values = {
+        static_values = ["1970-01-01" "1970-01-02"]
+      }
+      time_granularity_day = "DAY"
+    }
+  }
+}
+`, rId, rName))
+}
+
 func testAccDataSetConfigTags1(rId, rName, key1, value1 string) string {
 	return acctest.ConfigCompose(
 		testAccDataSetConfigBase(rId, rName),
