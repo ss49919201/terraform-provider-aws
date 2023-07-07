@@ -108,6 +108,12 @@ func ResourceDataSet() *schema.Resource {
 					},
 				},
 			},
+			"data_set_parameters": {
+				Type:     schema.TypeSet,
+				MinItems: 1,
+				Optional: true,
+				Elem:     &schema.Resource{},
+			},
 			"data_set_id": {
 				Type:     schema.TypeString,
 				Required: true,
