@@ -1142,6 +1142,39 @@ func resourceDataSetDelete(ctx context.Context, d *schema.ResourceData, meta int
 	return nil
 }
 
+func expandStringDataSetParameter(tfSet *schema.Set) *quicksight.StringDatasetParameter {
+	if tfSet.Len() == 0 {
+		return nil
+	}
+
+	stringDataSetParameter := &quicksight.StringDatasetParameter{}
+
+	for _, v := range tfSet.List() {
+		vMap := v.(map[string]interface{})
+
+		stringDataSetParameter := &quicksight.StringDatasetParameter{
+			Id:        aws.String(vMap["id"].(string)),
+			Name:      aws.String(vMap["name"].(string)),
+			ValueType: aws.String(vMap["value_type"].(string)),
+		}
+		for _, defaultValues := range vMap["default_values"].(*schema.Set).List() {
+			defaultValuesMap := defaultValues.(map[string]interface{})
+			if staticValue, ok := defaultValuesMap["static_values"].([]interface{}); ok {
+				var values []string
+				for _, str := range staticValue {
+					values = append(values, str.(string))
+				}
+
+				stringDataSetParameter.DefaultValues = &quicksight.StringDatasetParameterDefaultValues{
+					StaticValues: aws.StringSlice(values),
+				}
+			}
+		}
+	}
+
+	return stringDataSetParameter
+}
+
 func expandDataSetColumnGroups(tfList []interface{}) []*quicksight.ColumnGroup {
 	if len(tfList) == 0 {
 		return nil
