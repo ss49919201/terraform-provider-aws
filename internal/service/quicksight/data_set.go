@@ -3100,7 +3100,7 @@ func flattenDataSetParameters(apiObject []*quicksight.DatasetParameter, resource
 			continue
 		}
 
-		tfMap := make(map[string]interface{})
+		tfMap := map[string]interface{}{}
 
 		if v.StringDatasetParameter != nil {
 			tfMap["string_dataset_parameter"] = flattenStringDataSetParameter(v.StringDatasetParameter)
@@ -3127,7 +3127,7 @@ func flattenStringDataSetParameter(apiObject *quicksight.StringDatasetParameter)
 		return nil
 	}
 
-	var tfMap map[string]interface{}
+	tfMap := map[string]interface{}{}
 	if apiObject.Id != nil {
 		tfMap["id"] = aws.StringValue(apiObject.Id)
 	}
@@ -3149,7 +3149,7 @@ func flattenStringDatasetDefaultValues(apiObject *quicksight.StringDatasetParame
 		return nil
 	}
 
-	var tfMap map[string]interface{}
+	tfMap := map[string]interface{}{}
 	if apiObject.StaticValues != nil {
 		tfMap["static_values"] = aws.StringValueSlice(apiObject.StaticValues)
 	}
@@ -3162,7 +3162,7 @@ func flattenIntegerDataSetParameter(apiObject *quicksight.IntegerDatasetParamete
 		return nil
 	}
 
-	var tfMap map[string]interface{}
+	tfMap := map[string]interface{}{}
 	if apiObject.Id != nil {
 		tfMap["id"] = aws.StringValue(apiObject.Id)
 	}
@@ -3184,7 +3184,7 @@ func flattenIntegerDatasetDefaultValues(apiObject *quicksight.IntegerDatasetPara
 		return nil
 	}
 
-	var tfMap map[string]interface{}
+	tfMap := map[string]interface{}{}
 	if apiObject.StaticValues != nil {
 		tfMap["static_values"] = aws.Int64ValueSlice(apiObject.StaticValues)
 	}
