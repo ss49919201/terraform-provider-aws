@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"regexp"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -20,6 +22,7 @@ import (
 	tftags "github.com/hashicorp/terraform-provider-aws/internal/tags"
 	"github.com/hashicorp/terraform-provider-aws/internal/verify"
 	"github.com/hashicorp/terraform-provider-aws/names"
+	"github.com/k0kubun/pp"
 )
 
 // @SDKResource("aws_quicksight_data_set", name="Data Set")
@@ -111,8 +114,9 @@ func ResourceDataSet() *schema.Resource {
 			"data_set_parameters": {
 				Type:     schema.TypeSet,
 				MinItems: 1,
+				MaxItems: 32,
 				Optional: true,
-				Elem:     &schema.Resource{},
+				Elem:     dataSetParametersSchema(),
 			},
 			"data_set_id": {
 				Type:     schema.TypeString,
@@ -837,6 +841,108 @@ func physicalTableMapSchema() *schema.Resource {
 	}
 }
 
+func dataSetParametersSchema() *schema.Resource {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"string_dataset_parameter": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:     schema.TypeString,
+							Required: true,
+							ValidateFunc: validation.All(
+								validation.StringLenBetween(0, 128),
+								validation.StringMatch(regexp.MustCompile(`^[a-zA-Z0-9-]+$`), "must contain only alphanumeric and hyphen characters"),
+							),
+						},
+						"name": {
+							Type:     schema.TypeString,
+							Required: true,
+							ValidateFunc: validation.All(
+								validation.StringLenBetween(0, 2048),
+								validation.StringMatch(regexp.MustCompile(`^[a-zA-Z0-9-]+$`), "must contain only alphanumeric and hyphen characters"),
+							),
+						},
+						"value_type": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(quicksight.DatasetParameterValueType_Values(), false),
+						},
+						"default_values": {
+							Type:     schema.TypeSet,
+							Optional: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"static_values": {
+										Type:     schema.TypeList,
+										Optional: true,
+										MinItems: 1,
+										MaxItems: 32,
+										Elem: &schema.Schema{
+											Type: schema.TypeString,
+											ValidateFunc: validation.All(
+												validation.StringLenBetween(0, 512),
+											),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"integer_dataset_parameter": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:     schema.TypeString,
+							Required: true,
+							ValidateFunc: validation.All(
+								validation.StringLenBetween(0, 128),
+								validation.StringMatch(regexp.MustCompile(`^[a-zA-Z0-9-]+$`), "must contain only alphanumeric and hyphen characters"),
+							),
+						},
+						"name": {
+							Type:     schema.TypeString,
+							Required: true,
+							ValidateFunc: validation.All(
+								validation.StringLenBetween(0, 2048),
+								validation.StringMatch(regexp.MustCompile(`^[a-zA-Z0-9-]+$`), "must contain only alphanumeric and hyphen characters"),
+							),
+						},
+						"value_type": {
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: validation.StringInSlice(quicksight.DatasetParameterValueType_Values(), false),
+						},
+						"default_values": {
+							Type:     schema.TypeSet,
+							Optional: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"static_values": {
+										Type:     schema.TypeList,
+										Optional: true,
+										MinItems: 1,
+										MaxItems: 32,
+										Elem: &schema.Schema{
+											Type: schema.TypeInt,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func resourceDataSetCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	conn := meta.(*conns.AWSClient).QuickSightConn()
 
@@ -887,6 +993,14 @@ func resourceDataSetCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 	if v, ok := d.GetOk("row_level_permission_tag_configuration"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
 		input.RowLevelPermissionTagConfiguration = expandDataSetRowLevelPermissionTagConfigurations(v.([]interface{}))
+	}
+
+	if v, ok := d.Get("data_set_parameters").(*schema.Set); ok && v.Len() > 0 {
+		input.DatasetParameters = expandDataSetParameters(v)
+	} else {
+		pp.ColoringEnabled = false
+		f, _ := os.Create("/Users/sakaeshinya/src/terraform-provider-aws/" + "resourceDataSetCreate")
+		pp.Fprintln(f, v)
 	}
 
 	_, err := conn.CreateDataSetWithContext(ctx, input)
@@ -1011,11 +1125,20 @@ func resourceDataSetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		}
 	}
 
+	if err := d.Set("data_set_parameters", flattenDataSetParameters(dataSet.DatasetParameters, dataSetParametersSchema())); err != nil {
+		return diag.Errorf("setting data_set_parameters: %s", err)
+	}
+
 	return nil
 }
 
 func resourceDataSetUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	conn := meta.(*conns.AWSClient).QuickSightConn()
+
+	pp.ColoringEnabled = false
+	f, _ := os.Create("/Users/sakaeshinya/src/terraform-provider-aws/" + "resourceDataSetUpdate")
+	pp.Fprintln(f, d)
+	pp.Println(d)
 
 	if d.HasChangesExcept("permissions", "tags", "tags_all", "refresh_properties") {
 		awsAccountId, dataSetId, err := ParseDataSetID(d.Id())
@@ -1030,7 +1153,6 @@ func resourceDataSetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			PhysicalTableMap: expandDataSetPhysicalTableMap(d.Get("physical_table_map").(*schema.Set)),
 			Name:             aws.String(d.Get("name").(string)),
 		}
-
 		params.ColumnGroups = expandDataSetColumnGroups(d.Get("column_groups").([]interface{}))
 
 		params.ColumnLevelPermissionRules = expandDataSetColumnLevelPermissionRules(d.Get("column_level_permission_rules").([]interface{}))
@@ -1044,6 +1166,8 @@ func resourceDataSetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		params.RowLevelPermissionDataSet = expandDataSetRowLevelPermissionDataSet(d.Get("row_level_permission_data_set").([]interface{}))
 
 		params.RowLevelPermissionTagConfiguration = expandDataSetRowLevelPermissionTagConfigurations(d.Get("row_level_permission_tag_configuration").([]interface{}))
+
+		params.DatasetParameters = expandDataSetParameters(d.Get("data_set_parameters").(*schema.Set))
 
 		_, err = conn.UpdateDataSetWithContext(ctx, params)
 		if err != nil {
@@ -1142,6 +1266,116 @@ func resourceDataSetDelete(ctx context.Context, d *schema.ResourceData, meta int
 	return nil
 }
 
+func expandDataSetParameters(tfSet *schema.Set) []*quicksight.DatasetParameter {
+	if tfSet.Len() == 0 {
+		return nil
+	}
+
+	var dataSetParameters []*quicksight.DatasetParameter
+
+	for _, tfElem := range tfSet.List() {
+		tfElmMap := tfElem.(map[string]interface{})
+
+		if stringDataSetList, ok := tfElmMap["string_dataset_parameter"].((*schema.Set)); ok {
+			for _, v := range stringDataSetList.List() {
+				stringDataSetParameter := expandStringDataSetParameter2(v.(map[string]interface{}))
+				if stringDataSetParameter == nil {
+					return nil
+				}
+
+				dataSetParameter := &quicksight.DatasetParameter{
+					StringDatasetParameter: stringDataSetParameter,
+				}
+				dataSetParameters = append(dataSetParameters, dataSetParameter)
+			}
+		}
+
+		if integerDataSetList, ok := tfElmMap["integer_dataset_parameter"].((*schema.Set)); ok {
+			for _, v := range integerDataSetList.List() {
+				integerDataSetParameter := expandIntegerDataSetParameter2(v.(map[string]interface{}))
+				if integerDataSetParameter == nil {
+					return nil
+				}
+
+				dataSetParameter := &quicksight.DatasetParameter{
+					IntegerDatasetParameter: integerDataSetParameter,
+				}
+				dataSetParameters = append(dataSetParameters, dataSetParameter)
+			}
+		}
+
+		// for k, vTmp := range tfElmMap {
+		// 	v := vTmp.(*schema.Set)
+		// 	if k == "string_dataset_parameter" {
+		// 		if v.Len() == 0 {
+		// 			continue
+		// 		}
+
+		// 		for _, stringDataset := range v.List() {
+		// 			stringDataSetParameter := expandStringDataSetParameter2(stringDataset.(map[string]interface{}))
+		// 			if stringDataSetParameter == nil {
+		// 				return nil
+		// 			}
+
+		// 			dataSetParameters = append(dataSetParameters, &quicksight.DatasetParameter{
+		// 				StringDatasetParameter: stringDataSetParameter,
+		// 			})
+		// 		}
+		// 	}
+
+		// 	if k == "integer_dataset_parameter" {
+		// 		if v.Len() == 0 {
+		// 			continue
+		// 		}
+
+		// 		for _, integerDataset := range v.List() {
+		// 			integerDataSetParameter := expandIntegerDataSetParameter2(integerDataset.(map[string]interface{}))
+		// 			if integerDataSetParameter == nil {
+		// 				return nil
+		// 			}
+
+		// 			dataSetParameters = append(dataSetParameters, &quicksight.DatasetParameter{
+		// 				IntegerDatasetParameter: integerDataSetParameter,
+		// 			})
+		// 		}
+		// 	}
+		// }
+	}
+	return dataSetParameters
+}
+
+func expandDataSetParameter(tfMap map[string]interface{}) *quicksight.DatasetParameter {
+	if len(tfMap) == 0 {
+		return nil
+	}
+
+	dataSetParameter := &quicksight.DatasetParameter{}
+
+	f, _ := os.Create("/Users/sakaeshinya/src/terraform-provider-aws/" + "expandDataSetParameter")
+	pp.Fprintln(f, tfMap)
+
+	if tfMapRaw, ok := tfMap["string_dataset_parameter"].(*schema.Set); ok && tfMapRaw.Len() > 0 {
+		// tfMapRawに2つ分入っている
+		f, _ := os.Create("/Users/sakaeshinya/src/terraform-provider-aws/" + "string_dataset_parameter")
+		pp.Fprintln(f, tfMapRaw)
+		stringDataSetParameter := expandStringDataSetParameter(tfMapRaw)
+		if stringDataSetParameter == nil {
+			return nil
+		}
+		dataSetParameter.StringDatasetParameter = stringDataSetParameter
+	} else if tfMapRaw, ok := tfMap["integer_dataset_parameter"].(*schema.Set); ok && tfMapRaw.Len() > 0 {
+		f, _ := os.Create("/Users/sakaeshinya/src/terraform-provider-aws/" + "integer_dataset_parameter")
+		pp.Fprintln(f, tfMapRaw)
+		integerDataSetParameter := expandIntegerDataSetParameter(tfMapRaw)
+		if integerDataSetParameter == nil {
+			return nil
+		}
+		dataSetParameter.IntegerDatasetParameter = integerDataSetParameter
+	}
+
+	return dataSetParameter
+}
+
 func expandStringDataSetParameter(tfSet *schema.Set) *quicksight.StringDatasetParameter {
 	if tfSet.Len() == 0 {
 		return nil
@@ -1173,6 +1407,123 @@ func expandStringDataSetParameter(tfSet *schema.Set) *quicksight.StringDatasetPa
 	}
 
 	return stringDataSetParameter
+}
+
+func expandStringDataSetParameter2(tfMap map[string]interface{}) *quicksight.StringDatasetParameter {
+	if len(tfMap) == 0 {
+		return nil
+	}
+
+	stringDataSetParameter := &quicksight.StringDatasetParameter{
+		Id:        aws.String(tfMap["id"].(string)),
+		Name:      aws.String(tfMap["name"].(string)),
+		ValueType: aws.String(tfMap["value_type"].(string)),
+	}
+
+	if defaultValues, ok := tfMap["default_values"].(*schema.Set); ok && defaultValues.Len() > 0 {
+		if vMap, ok := defaultValues.List()[0].(map[string]interface{}); ok {
+			if staticValue, ok := vMap["static_values"].([]interface{}); ok {
+				var values []string
+				for _, str := range staticValue {
+					values = append(values, str.(string))
+				}
+
+				stringDataSetParameter.DefaultValues = &quicksight.StringDatasetParameterDefaultValues{
+					StaticValues: aws.StringSlice(values),
+				}
+			}
+		}
+
+		// for _, v := range defaultValues.List() {
+		// 	vMap := v.(map[string]interface{})
+		// 	if staticValue, ok := vMap["static_values"].([]interface{}); ok {
+		// 		var values []string
+		// 		for _, str := range staticValue {
+		// 			values = append(values, str.(string))
+		// 		}
+
+		// 		stringDataSetParameter.DefaultValues = &quicksight.StringDatasetParameterDefaultValues{
+		// 			StaticValues: aws.StringSlice(values),
+		// 		}
+		// 	}
+		// }
+	}
+
+	// for _, defaultValues := range tfMap["default_values"].(*schema.Set).List() {
+	// 	defaultValuesMap := defaultValues.(map[string]interface{})
+	// 	if staticValue, ok := defaultValuesMap["static_values"].([]interface{}); ok {
+	// 		var values []string
+	// 		for _, str := range staticValue {
+	// 			values = append(values, str.(string))
+	// 		}
+
+	// 		stringDataSetParameter.DefaultValues = &quicksight.StringDatasetParameterDefaultValues{
+	// 			StaticValues: aws.StringSlice(values),
+	// 		}
+	// 	}
+	// }
+
+	return stringDataSetParameter
+}
+
+func expandIntegerDataSetParameter(tfSet *schema.Set) *quicksight.IntegerDatasetParameter {
+	if tfSet.Len() == 0 {
+		return nil
+	}
+
+	integerDataSetParameter := &quicksight.IntegerDatasetParameter{}
+
+	for _, v := range tfSet.List() {
+		vMap := v.(map[string]interface{})
+
+		integerDataSetParameter := &quicksight.IntegerDatasetParameter{
+			Id:        aws.String(vMap["id"].(string)),
+			Name:      aws.String(vMap["name"].(string)),
+			ValueType: aws.String(vMap["value_type"].(string)),
+		}
+		for _, defaultValues := range vMap["default_values"].(*schema.Set).List() {
+			defaultValuesMap := defaultValues.(map[string]interface{})
+			if staticValue, ok := defaultValuesMap["static_values"].([]interface{}); ok {
+				var values []int64
+				for _, integer := range staticValue {
+					values = append(values, int64(integer.(int)))
+				}
+
+				integerDataSetParameter.DefaultValues = &quicksight.IntegerDatasetParameterDefaultValues{
+					StaticValues: aws.Int64Slice(values),
+				}
+			}
+		}
+	}
+
+	return integerDataSetParameter
+}
+
+func expandIntegerDataSetParameter2(tfMap map[string]interface{}) *quicksight.IntegerDatasetParameter {
+	if len(tfMap) == 0 {
+		return nil
+	}
+
+	integerDataSetParameter := &quicksight.IntegerDatasetParameter{
+		Id:        aws.String(tfMap["id"].(string)),
+		Name:      aws.String(tfMap["name"].(string)),
+		ValueType: aws.String(tfMap["value_type"].(string)),
+	}
+	for _, defaultValues := range tfMap["default_values"].(*schema.Set).List() {
+		defaultValuesMap := defaultValues.(map[string]interface{})
+		if staticValue, ok := defaultValuesMap["static_values"].([]interface{}); ok {
+			var values []int64
+			for _, integer := range staticValue {
+				values = append(values, int64(integer.(int)))
+			}
+
+			integerDataSetParameter.DefaultValues = &quicksight.IntegerDatasetParameterDefaultValues{
+				StaticValues: aws.Int64Slice(values),
+			}
+		}
+	}
+
+	return integerDataSetParameter
 }
 
 func expandDataSetColumnGroups(tfList []interface{}) []*quicksight.ColumnGroup {
@@ -2736,6 +3087,109 @@ func flattenTagRules(apiObject []*quicksight.RowLevelPermissionTagRule) []interf
 	}
 
 	return tfList
+}
+
+func flattenDataSetParameters(apiObject []*quicksight.DatasetParameter, resourceSchema *schema.Resource) *schema.Set {
+	if len(apiObject) == 0 {
+		return nil
+	}
+
+	var tfList []interface{}
+	for _, v := range apiObject {
+		if v == nil {
+			continue
+		}
+
+		tfMap := make(map[string]interface{})
+
+		if v.StringDatasetParameter != nil {
+			tfMap["string_dataset_parameter"] = flattenStringDataSetParameter(v.StringDatasetParameter)
+		}
+
+		if v.IntegerDatasetParameter != nil {
+			tfMap["integer_dataset_parameter"] = flattenIntegerDataSetParameter(v.IntegerDatasetParameter)
+		}
+
+		if v.DecimalDatasetParameter != nil {
+		}
+
+		if v.DateTimeDatasetParameter != nil {
+		}
+
+		tfList = append(tfList, tfMap)
+	}
+
+	return schema.NewSet(schema.HashResource(resourceSchema), tfList)
+}
+
+func flattenStringDataSetParameter(apiObject *quicksight.StringDatasetParameter) interface{} {
+	if apiObject == nil {
+		return nil
+	}
+
+	var tfMap map[string]interface{}
+	if apiObject.Id != nil {
+		tfMap["id"] = aws.StringValue(apiObject.Id)
+	}
+	if apiObject.Name != nil {
+		tfMap["name"] = aws.StringValue(apiObject.Name)
+	}
+	if apiObject.ValueType != nil {
+		tfMap["value_type"] = aws.StringValue(apiObject.ValueType)
+	}
+	if apiObject.DefaultValues != nil {
+		tfMap["default_values"] = flattenStringDatasetDefaultValues(apiObject.DefaultValues)
+	}
+
+	return []interface{}{tfMap}
+}
+
+func flattenStringDatasetDefaultValues(apiObject *quicksight.StringDatasetParameterDefaultValues) interface{} {
+	if apiObject == nil {
+		return nil
+	}
+
+	var tfMap map[string]interface{}
+	if apiObject.StaticValues != nil {
+		tfMap["static_values"] = aws.StringValueSlice(apiObject.StaticValues)
+	}
+
+	return []interface{}{tfMap}
+}
+
+func flattenIntegerDataSetParameter(apiObject *quicksight.IntegerDatasetParameter) interface{} {
+	if apiObject == nil {
+		return nil
+	}
+
+	var tfMap map[string]interface{}
+	if apiObject.Id != nil {
+		tfMap["id"] = aws.StringValue(apiObject.Id)
+	}
+	if apiObject.Name != nil {
+		tfMap["name"] = aws.StringValue(apiObject.Name)
+	}
+	if apiObject.ValueType != nil {
+		tfMap["value_type"] = aws.StringValue(apiObject.ValueType)
+	}
+	if apiObject.DefaultValues != nil {
+		tfMap["default_values"] = flattenIntegerDatasetDefaultValues(apiObject.DefaultValues)
+	}
+
+	return []interface{}{tfMap}
+}
+
+func flattenIntegerDatasetDefaultValues(apiObject *quicksight.IntegerDatasetParameterDefaultValues) interface{} {
+	if apiObject == nil {
+		return nil
+	}
+
+	var tfMap map[string]interface{}
+	if apiObject.StaticValues != nil {
+		tfMap["static_values"] = aws.Int64ValueSlice(apiObject.StaticValues)
+	}
+
+	return []interface{}{tfMap}
 }
 
 func ParseDataSetID(id string) (string, string, error) {
