@@ -193,6 +193,42 @@ func TestAccQuickSightDataSource_permissions(t *testing.T) {
 	})
 }
 
+func TestAccQuickSightDataSource_name(t *testing.T) {
+	ctx := acctest.Context(t)
+	var dataSource quicksight.DataSource
+	resourceName := "aws_quicksight_data_source.test"
+	rName := sdkacctest.RandomWithPrefix(acctest.ResourcePrefix)
+	rId := sdkacctest.RandomWithPrefix(acctest.ResourcePrefix)
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.PreCheck(ctx, t) },
+		ErrorCheck:               acctest.ErrorCheck(t, quicksight.EndpointsID),
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories,
+		CheckDestroy:             testAccCheckDataSourceDestroy(ctx),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDataSourceConfig_basic(rId, rName),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckDataSourceExists(ctx, resourceName, &dataSource),
+					resource.TestCheckResourceAttr(resourceName, "name", rName),
+				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccDataSourceConfig_updateName(rId, rName),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckDataSourceExists(ctx, resourceName, &dataSource),
+					resource.TestCheckResourceAttr(resourceName, "name", "updated-name"),
+				),
+			},
+		},
+	})
+}
+
 func testAccCheckDataSourceExists(ctx context.Context, resourceName string, dataSource *quicksight.DataSource) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[resourceName]
@@ -502,4 +538,27 @@ resource "aws_quicksight_data_source" "test" {
   type = "S3"
 }
 `, rId, rName))
+}
+
+func testAccDataSourceConfig_updateName(rId, rName string) string {
+	return acctest.ConfigCompose(
+		testAccBaseDataSourceConfig(rName),
+		testAccDataSource_UserConfig(rName),
+		fmt.Sprintf(`
+resource "aws_quicksight_data_source" "test" {
+  data_source_id = %[1]q
+  name           = "updated-name"
+
+  parameters {
+    s3 {
+      manifest_file_location {
+        bucket = aws_s3_bucket.test.bucket
+        key    = aws_s3_object.test.key
+      }
+    }
+  }
+
+  type = "S3"
+}
+`, rId))
 }
