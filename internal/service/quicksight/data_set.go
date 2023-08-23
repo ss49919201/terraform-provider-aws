@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -350,6 +351,76 @@ func ResourceDataSet() *schema.Resource {
 									},
 								},
 							},
+						},
+					},
+				},
+				"dataset_parameters": {
+					Type:     schema.TypeList,
+					MinItems: 1,
+					MaxItems: 32,
+					Optional: true,
+					Elem: &schema.Resource{
+						Schema: map[string]*schema.Schema{
+							"date_time_dataset_parameter": { // https://docs.aws.amazon.com/quicksight/latest/APIReference/API_DateTimeDatasetParameter.html
+								Type:     schema.TypeList,
+								MinItems: 1,
+								MaxItems: 1,
+								Optional: true,
+								Elem: &schema.Resource{
+									Schema: map[string]*schema.Schema{
+										"id": {
+											Type:     schema.TypeString,
+											Required: true,
+											ValidateFunc: validation.All(
+												validation.StringLenBetween(1, 128),
+												validation.StringMatch(regexp.MustCompile(`^[a-zA-Z0-9]+$`), ""),
+											),
+										},
+										"name": {
+											Type:     schema.TypeString,
+											Required: true,
+											ValidateFunc: validation.All(
+												validation.StringLenBetween(1, 2048),
+												validation.StringMatch(regexp.MustCompile(`^[a-zA-Z0-9]+$`), ""),
+											),
+										},
+										"value_type": {
+											Type:         schema.TypeString,
+											Required:     true,
+											ValidateFunc: validation.StringInSlice(quicksight.DatasetParameterValueType_Values(), false),
+										},
+										"default_values": { // https://docs.aws.amazon.com/quicksight/latest/APIReference/API_DateTimeDatasetParameterDefaultValues.html
+											Type:     schema.TypeList,
+											MinItems: 1,
+											MaxItems: 1,
+											Optional: true,
+											Elem: &schema.Resource{
+												Schema: map[string]*schema.Schema{
+													"static_values": {
+														Type:     schema.TypeList,
+														Optional: true,
+														MinItems: 1,
+														MaxItems: 50000,
+														Elem: &schema.Schema{
+															Type:         schema.TypeString,
+															ValidateFunc: verify.ValidUTCTimestamp,
+														},
+													},
+												},
+											},
+										},
+										"time_granularity": {
+											Type:         schema.TypeString,
+											Optional:     true,
+											ValidateFunc: validation.StringInSlice(quicksight.TimeGranularity_Values(), false),
+										},
+									},
+								},
+							},
+							// TODO:
+							// "decimal_parameter_declaration": decimalDatasetParameter(),
+							// "integer_parameter_declaration": integerDatasetParameter(),
+							// "string_parameter_declaration":  stringDatasetParameter(),
 						},
 					},
 				},
