@@ -2860,6 +2860,65 @@ func flattenTagRules(apiObject []*quicksight.RowLevelPermissionTagRule) []interf
 	return tfList
 }
 
+func flattenDatasetParameters(apiObject []*quicksight.DatasetParameter) []interface{} {
+	if len(apiObject) == 0 {
+		return nil
+	}
+
+	var tfList []interface{}
+	for _, parameter := range apiObject {
+		if parameter == nil {
+			continue
+		}
+
+		tfMap := map[string]interface{}{}
+		if parameter.DateTimeDatasetParameter != nil {
+			tfMap["date_time_dataset_parameter"] = flattenDateTimeDatasetParameter(parameter.DateTimeDatasetParameter)
+		}
+		tfList = append(tfList, tfMap)
+	}
+
+	return tfList
+}
+
+func flattenDateTimeDatasetParameter(apiObject *quicksight.DateTimeDatasetParameter) []interface{} {
+	if apiObject == nil {
+		return nil
+	}
+
+	tfMap := map[string]interface{}{}
+	if apiObject.DefaultValues != nil {
+		tfMap["default_values"] = flattenDateTimeDatasetParameterDefaultValues(apiObject.DefaultValues)
+	}
+	if apiObject.Id != nil {
+		tfMap["id"] = aws.StringValue(apiObject.Id)
+	}
+	if apiObject.Name != nil {
+		tfMap["name"] = aws.StringValue(apiObject.Name)
+	}
+	if apiObject.ValueType != nil {
+		tfMap["value_type"] = aws.StringValue(apiObject.ValueType)
+	}
+	if apiObject.TimeGranularity != nil {
+		tfMap["time_granularity"] = aws.StringValue(apiObject.TimeGranularity)
+	}
+
+	return []interface{}{tfMap}
+}
+
+func flattenDateTimeDatasetParameterDefaultValues(apiObject *quicksight.DateTimeDatasetParameterDefaultValues) []interface{} {
+	if apiObject == nil {
+		return nil
+	}
+
+	tfMap := map[string]interface{}{}
+	if apiObject.StaticValues != nil {
+		tfMap["static_values"] = flex.FlattenTimeStringList(apiObject.StaticValues, time.RFC3339)
+	}
+
+	return []interface{}{tfMap}
+}
+
 func ParseDataSetID(id string) (string, string, error) {
 	parts := strings.SplitN(id, ",", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
