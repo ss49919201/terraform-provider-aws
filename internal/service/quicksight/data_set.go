@@ -400,7 +400,7 @@ func ResourceDataSet() *schema.Resource {
 														Type:     schema.TypeList,
 														Optional: true,
 														MinItems: 1,
-														MaxItems: 50000,
+														MaxItems: 32,
 														Elem: &schema.Schema{
 															Type:         schema.TypeString,
 															ValidateFunc: verify.ValidUTCTimestamp,
