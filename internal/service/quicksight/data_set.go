@@ -10,6 +10,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/quicksight"
@@ -958,6 +959,10 @@ func resourceDataSetCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 	if v, ok := d.GetOk("row_level_permission_tag_configuration"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
 		input.RowLevelPermissionTagConfiguration = expandDataSetRowLevelPermissionTagConfigurations(v.([]interface{}))
+	}
+
+	if v, ok := d.GetOk("dataset_parameters"); ok && len(v.([]interface{})) > 0 && v.([]interface{})[0] != nil {
+		input.DatasetParameters = expandDataSetDatasetParameters(v.([]interface{}))
 	}
 
 	_, err := conn.CreateDataSetWithContext(ctx, input)
@@ -2045,6 +2050,93 @@ func expandDataSetTagRule(tfMap map[string]interface{}) *quicksight.RowLevelPerm
 	}
 
 	return tagRules
+}
+
+func expandDataSetDatasetParameters(tfList []interface{}) []*quicksight.DatasetParameter {
+	if len(tfList) == 0 {
+		return nil
+	}
+
+	var params []*quicksight.DatasetParameter
+	for _, tfMapRaw := range tfList {
+		tfMap, ok := tfMapRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		param := expandDataSetDatasetParameter(tfMap)
+		if param == nil {
+			continue
+		}
+
+		params = append(params, param)
+	}
+
+	return params
+}
+
+func expandDataSetDatasetParameter(tfMap map[string]interface{}) *quicksight.DatasetParameter {
+	if tfMap == nil {
+		return nil
+	}
+
+	param := &quicksight.DatasetParameter{}
+
+	if v, ok := tfMap["date_time_parameter_declaration"].([]interface{}); ok && len(v) > 0 {
+		param.DateTimeDatasetParameter = expandDataSetDateTimeDatasetParameter(v)
+	}
+
+	return param
+}
+
+func expandDataSetDateTimeDatasetParameter(tfList []interface{}) *quicksight.DateTimeDatasetParameter {
+	if len(tfList) == 0 || tfList[0] == nil {
+		return nil
+	}
+
+	tfMap, ok := tfList[0].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	param := &quicksight.DateTimeDatasetParameter{}
+
+	if v, ok := tfMap["id"].(string); ok && v != "" {
+		param.Id = aws.String(v)
+	}
+	if v, ok := tfMap["name"].(string); ok && v != "" {
+		param.Name = aws.String(v)
+	}
+	if v, ok := tfMap["value_type"].(string); ok && v != "" {
+		param.ValueType = aws.String(v)
+	}
+	if v, ok := tfMap["default_values"].([]interface{}); ok && len(v) > 0 {
+		param.DefaultValues = expandDateTimeDatasetParameterDefaultValues(v)
+	}
+	if v, ok := tfMap["time_granularity"].(string); ok && v != "" {
+		param.TimeGranularity = aws.String(v)
+	}
+
+	return param
+}
+
+func expandDateTimeDatasetParameterDefaultValues(tfList []interface{}) *quicksight.DateTimeDatasetParameterDefaultValues {
+	if len(tfList) == 0 || tfList[0] == nil {
+		return nil
+	}
+
+	tfMap, ok := tfList[0].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	values := &quicksight.DateTimeDatasetParameterDefaultValues{}
+
+	if v, ok := tfMap["static_values"].([]interface{}); ok && len(v) > 0 {
+		values.StaticValues = flex.ExpandStringTimeList(v, time.RFC3339)
+	}
+
+	return values
 }
 
 func flattenColumnGroups(apiObject []*quicksight.ColumnGroup) []interface{} {
